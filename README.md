@@ -1,5 +1,3 @@
-prepare hybrid readme like below wrt the jenkins.html below
-
 **# DevSecOps CI/CD Pipeline Enhanced**
 
 This project demonstrates an enterprise-grade **\*\*DevSecOps CI/CD pipeline\*\*** built for the **\*\*Resume Matcher\*\*** platform, integrating security, quality, testing, supply-chain protection, automated reporting, and multi-architecture container distribution from development through production release.
