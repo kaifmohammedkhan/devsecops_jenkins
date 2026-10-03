@@ -1,1549 +1,1337 @@
-**# DevSecOps CI/CD Pipeline Enhanced**
+# Jenkins DevSecOps CI/CD Pipeline
 
-This project demonstrates an enterprise-grade **\*\*DevSecOps CI/CD pipeline\*\*** built for the **\*\*Resume Matcher\*\*** platform, integrating security, quality, testing, supply-chain protection, automated reporting, and multi-architecture container distribution from development through production release.
+This project demonstrates an enterprise-grade **Jenkins-based DevSecOps CI/CD pipeline** for the **Resume Matcher** platform, integrating continuous integration, automated QA, security scanning, cloud-agent execution, containerization, multi-architecture publishing, cryptographic image signing, SBOM generation, supply-chain verification, and automated security reporting.
 
-The enhanced implementation extends the CI/CD lifecycle with **\*\*cryptographic commit signing and verification, secret detection with Gitleaks, static analysis with SonarCloud, vulnerability scanning with OWASP Dependency-Check and Trivy, automated unit and E2E testing, performance validation with k6, cryptographic container image signing with Cosign, SBOM generation with Syft, attestation verification, and automated HTML reporting\*\***.
+The implementation combines a locally hosted **Jenkins LTS controller**, **GitHub SCM**, **GitHub Actions Cloud Agents**, **zrok secure HTTPS ingress**, automated pre-main validation, production container publishing, **Cosign image signing**, **SPDX SBOM generation**, image and attestation verification, and automated HTML/email reporting.
 
-The final release workflow produces verifiable container artifacts for both **\*\*Docker Hub\*\*** and **\*\*GitHub Container Registry (GHCR)\*\***.
+The pipeline separates the software lifecycle into two primary paths:
 
-**---**
+pre-main
+   │
+   ├── CI
+   ├── OWASP
+   ├── QA
+   ├── SonarCloud
+   ├── Trivy
+   ├── Gitleaks
+   └── Security / QA Reports
+             │
+             ▼
+       Validation Passed
+             │
+             ▼
+           main
+             │
+             ├── Multi-Arch Docker Build
+             ├── GHCR Push
+             ├── Docker Hub Push
+             ├── Cosign Signing
+             ├── SPDX SBOM
+             ├── Attestation Verification
+             └── Security Evidence
 
-**## Access the Walkthrough**
+---
 
-[![Resume Matcher DevSecOps Pipeline]\(https\://img.youtube.com/vi/ApellkNGW-I/0.jpg)]\(https\://www\.youtube.com/embed/ApellkNGW-I?si=WgOHZJnp1O2Atu8q)
+## Access the Walkthrough
 
-[Watch the Resume Matcher DevSecOps Pipeline Walkthrough]\(https\://www\.youtube.com/embed/ApellkNGW-I?si=WgOHZJnp1O2Atu8q)
+[![Jenkins DevSecOps CI/CD Pipeline](https://img.youtube.com/vi/qBbtWlOH5rg/0.jpg)](https://www.youtube.com/embed/qBbtWlOH5rg?si=y8lQeAAUDfd1_1QU)
 
-**---**
+[Watch the Jenkins DevSecOps CI/CD Pipeline Walkthrough](https://www.youtube.com/embed/qBbtWlOH5rg?si=y8lQeAAUDfd1_1QU)
 
-**## 🛠 Enhanced DevSecOps Strategy**
+---
 
-\<div *align*="center">
+## 🏗️ Jenkins DevSecOps Strategy
 
-\<img src="images/cicdenhanced/cicdenhanced.png" width="1000"/>
+<div align="center">
+<img src="images/jenkins/JENKINS 1/jenkins1.1.png" width="1000"/>
+</div>
 
-\</div>
+The Jenkins implementation is organized into three major implementation stages:
 
+1. **Jenkins Infrastructure, SCM & Cloud-Agent Setup**
+2. **Secure Validation, QA, Security Scanning & Automated Reporting**
+3. **Production Container Build, Signing, SBOM & Supply-Chain Verification**
 
+The architecture combines a local Jenkins controller with dynamically provisioned GitHub Actions execution environments and a secure zrok ingress layer.
 
-The enhanced pipeline is organized into three major implementation stages:
+<div align="center">
 
-1\. **\*\*Commit Signing Setup\*\***
+<img src="images/jenkins/JENKINS 1/jenkins1.1.png" width="1000"/>
 
-2\. **\*\*Security Scanning, Secret Detection & Commit Verification\*\***
+</div>
 
-3\. **\*\*Image Build, Push, Signing & SBOM Generation\*\***
+---
 
-These stages extend the existing CI/CD lifecycle by adding verifiable software supply-chain security and machine-readable security evidence to the production release process.
+# Step 1: Jenkins Infrastructure, SCM & Cloud-Agent Setup
 
-\<div *align*="center">
+The first stage establishes the Jenkins control plane, source-control integration, execution environment, GitHub Actions cloud agents, and secure external connectivity.
 
-\<img src="images/cicdenhanced/CICD1/cicd1.1.png" width="1000"/>
+The Jenkins controller is deployed using the official Jenkins LTS Docker image with persistent Jenkins home storage.
 
-\</div>
+### Jenkins Installation
 
-**---**
+```bash
+docker pull jenkins/jenkins:lts
 
-**# Step 1: Commit Signing Setup**
-
-The pipeline infrastructure is organized around dedicated GitHub branches, with **\*\*\`pre-main\`\*\*** used for security and validation workflows and **\*\*\`main\`\*\*** representing the production release path.
-
-Automated notification secrets are configured using a dedicated **\*\*Google App Password\*\***, allowing GitHub Actions to securely dispatch security and QA reports directly to Gmail.
-
-Repository notification secrets include:
-
-\`\`\`text
-
-\# GitHub Repository Secrets Configuration
-
-EMAIL_USER=your-gmail-address
-
-EMAIL_PASS=your-google-app-password
-
-\`\`\`
-
-In addition to automated reporting, this stage introduces **\*\*cryptographic Git commit signing using GPG\*\***.
-
-Signed commits provide a mechanism for verifying that commits originated from the expected signing identity and have not been altered after signing.
-
-**### Generate a GPG Key**
-
-\`\`\`bash
-
-gpg --full-generate-key
-
-\`\`\`
-
-**### List Secret Keys**
-
-\`\`\`bash
-
-gpg --list-secret-keys --keyid-format LONG
-
-\`\`\`
-
-**### Configure Git Commit Signing**
-
-\`\`\`bash
-
-git config --global user.signingkey \<YOUR_KEY_ID>
-
-git config --global commit.gpgsign true
-
-\`\`\`
-
-**### Export the Public Key**
-
-\`\`\`bash
-
-gpg --armor --export \<YOUR_KEY_ID>
-
-\`\`\`
-
-The exported public key is added to GitHub under:
-
-\`\`\`text
-
-Settings → SSH and GPG keys
-
-\`\`\`
-
-Once configured, commits pushed to the repository can display GitHub's **\*\*Verified\*\*** badge, providing an additional layer of authenticity for the source-code supply chain.
-
-\<div *align*="center">
-
-\<img src="images/cicdenhanced/CICD1/cicd1.1.png" width="250"/>
-
-\<img src="images/cicdenhanced/CICD1/cicd1.2.png" width="250"/>
-
-\<img src="images/cicdenhanced/CICD1/cicd1.3.png" width="250"/>
-
-\<img src="images/devsecopscicd/CICD1/gpg-generate.png" width="250"/>
-
-\<img src="images/devsecopscicd/CICD1/gpg-config.png" width="250"/>
-
-\<img src="images/devsecopscicd/CICD1/github-gpg.png" width="250"/>
-
-\</div>
-
-**---**
-
-**# Step 2: Security Scanning, Secret Detection & Commit Verification**
-
-The enhanced security layer introduces a dedicated child workflow:
-
-\`\`\`text
-
-ci-security-checks.yaml
-
-\`\`\`
-
-This workflow is integrated into:
-
-\`\`\`text
-
-ci-security-pipeline.yaml
-
-\`\`\`
-
-The workflow adds two important supply-chain controls:
-
-\- **\*\*Gitleaks\*\*** for hardcoded-secret detection
-
-\- **\*\*GPG commit signature verification\*\*** for commit authenticity
-
-These controls execute alongside the existing security and quality validation process.
-
-**### Security Workflow**
-
-The security lifecycle combines:
-
-\- Gitleaks secret detection
-
-\- GPG commit verification
-
-\- SonarCloud static analysis
-
-\- Trivy security scanning
-
-\- Automated HTML report generation
-
-\- Email notification
-
-The goal is to ensure that source-code authenticity and secret hygiene are continuously validated alongside traditional vulnerability and code-quality analysis.
-
-The local:
-
-\`\`\`text
-
-premain.sh
-
-\`\`\`
-
-automation triggers the validation workflow and prompts the configured GPG signing process during commits.
-
-After execution, the workflow provides confirmation of:
-
-\- Commit authenticity
-
-\- Secret detection status
-
-\- Security scan results
-
-\- Automated HTML reporting
-
-The resulting security reports are delivered to Gmail alongside the existing SonarCloud and Trivy results.
-
-\<div *align*="center">
-
-\<img src="images/cicdenhanced/CICD2/cicd2.1.png" width="250"/>
-
-\<img src="images/cicdenhanced/CICD2/cicd2.2.png" width="250"/>
-
-\<img src="images/cicdenhanced/CICD2/cicd2.3.png" width="250"/>
-
-\<img src="images/cicdenhanced/CICD2/cicd2.4.png" width="250"/>
-
-\<img src="images/cicdenhanced/CICD2/cicd2.5.png" width="250"/>
-
-\<img src="images/cicdenhanced/CICD2/cicd2.6.png" width="250"/>
-
-\</div>
-
-**---**
-
-**# Step 3: Image Build, Push, Signing & SBOM Generation**
-
-The production pipeline on the **\*\*\`main\`\*\*** branch extends the existing image build and distribution process with additional software supply-chain security controls.
-
-After the vulnerability-free \`pre-main\` branch is merged into \`main\`, the:
-
-\`\`\`text
-
-docker-publish.yaml
-
-\`\`\`
-
-workflow builds and publishes the production container images.
-
-The enhanced workflow performs:
-
-\- Multi-architecture container builds
-
-\- Docker Hub publication
-
-\- GHCR publication
-
-\- Immutable image-digest identification
-
-\- Cosign image signing
-
-\- Syft SBOM generation
-
-\- Attestation verification
-
-\- Machine-readable evidence preservation
-
-\- Automated HTML reporting
-
-**### Multi-Architecture Build**
-
-Production images are built for:
-
-\`\`\`text
-
-linux/amd64
-
-linux/arm64
-
-\`\`\`
-
-This allows the same production release to support multiple CPU architectures.
-
-**### Container Image Signing**
-
-After the images are published, **\*\*Cosign\*\*** cryptographically signs the container images.
-
-The signing process anchors the image identity to its **\*\*immutable digest\*\***, providing stronger supply-chain verification than relying only on mutable tags such as:
-
-\`\`\`text
-
-latest
-
-\`\`\`
-
-This allows the published artifact to be independently associated with the exact image digest that was built and released.
-
-**### SBOM Generation**
-
-**\*\*Syft\*\*** generates Software Bill of Materials (SBOM) documents for the published images.
-
-The SBOMs provide machine-readable information about the software components contained within the production images.
-
-The generated SBOMs use the **\*\*SPDX\*\*** format.
-
-**### Attestation Verification**
-
-The pipeline also preserves and verifies attestation records associated with the released images.
-
-Machine-readable evidence is retained as GitHub Actions artifacts, allowing the generated security evidence to be independently inspected.
-
-The preserved evidence includes:
-
-\`\`\`text
-
-Cosign JSON
-
-SBOM JSON
-
-Attestation JSON
-
-\`\`\`
-
-**### Automated Release Reporting**
-
-The production workflow generates two HTML reports:
-
-\`\`\`text
-
-Docker Build & Push Report
-
-Docker Security Report
-
-\`\`\`
-
-The reports provide visibility into:
-
-\- Multi-architecture image builds
-
-\- Docker Hub publication
-
-\- GHCR publication
-
-\- Image signing
-
-\- SBOM generation
-
-\- Attestation verification
-
-\- Release metadata
-
-The reports are automatically delivered through email using the configured notification system.
-
-\<div *align*="center">
-
-\<img src="images/cicdenhanced/CICD3/cicd3.1.png" width="250"/>
-
-\<img src="images/cicdenhanced/CICD3/cicd3.2.png" width="250"/>
-
-\<img src="images/cicdenhanced/CICD3/cicd3.3.png" width="250"/>
-
-\<img src="images/cicdenhanced/CICD3/cicd3.4.png" width="250"/>
-
-\<img src="images/cicdenhanced/CICD3/cicd3.5.png" width="250"/>
-
-\<img src="images/cicdenhanced/CICD3/cicd3.6.png" width="250"/>
-
-\<img src="images/devsecopscicd/CICD3/main-sh.png" width="250"/>
-
-\<img src="images/devsecopscicd/CICD3/actions-success.png" width="250"/>
-
-\<img src="images/devsecopscicd/CICD3/commit-verified.png" width="250"/>
-
-\<img src="images/devsecopscicd/CICD3/email-report.png" width="250"/>
-
-\<img src="images/devsecopscicd/CICD3/docker-build-report.png" width="250"/>
-
-\<img src="images/devsecopscicd/CICD3/docker-security-report.png" width="250"/>
-
-\</div>
-
-**---**
-
-**# 🔄 End-to-End Enhanced Pipeline Flow**
-
-\`\`\`text
-
-Developer Changes
-
-       │
-
-       ▼
-
-   pre-main
-
-       │
-
-       ├── GPG Commit Signing
-
-       │
-
-       ├── Commit Signature Verification
-
-       │
-
-       ├── Gitleaks Secret Detection
-
-       │
-
-       ├── SonarCloud Analysis
-
-       │
-
-       ├── Trivy Security Scanning
-
-       │
-
-       ├── OWASP Dependency Scanning
-
-       │
-
-       ├── Jest Unit Testing
-
-       │
-
-       ├── Cypress E2E Testing
-
-       │
-
-       ├── k6 Smoke Testing
-
-       │
-
-       └── k6 Load Testing
-
-              │
-
-              ▼
-
-       Security / Quality
-
-             Gates
-
-              │
-
-              ▼
-
-        Validation Passed
-
-              │
-
-              ▼
-
-            main
-
-              │
-
-              ▼
-
-     Multi-Architecture Build
-
-        ┌───────────────┐
-
-        │               │
-
-        ▼               ▼
-
-      GHCR          Docker Hub
-
-        │               │
-
-        └───────┬───────┘
-
-                │
-
-                ▼
-
-       Immutable Digest
-
-                │
-
-                ▼
-
-         Cosign Signing
-
-                │
-
-                ▼
-
-          Syft SBOM
-
-          Generation
-
-                │
-
-                ▼
-
-       Attestation Verify
-
-                │
-
-                ▼
-
-      Machine-Readable Evidence
-
-                │
-
-                ▼
-
-       HTML Release Reports
-
-                │
-
-                ▼
-
-        Email Notification
-
-\`\`\`
-
-**---**
-
-**# 🔐 DevSecOps Security Controls**
-
-The enhanced pipeline introduces multiple layers of protection across the software supply chain.
-
-\| Security Layer | Technology | Purpose |
-
-\|---|---|---|
-
-\| Commit Authenticity | GPG | Cryptographically sign and verify Git commits |
-
-\| Secret Detection | Gitleaks | Detect hardcoded credentials and secrets |
-
-\| Static Analysis | SonarCloud | Identify code-quality and security issues |
-
-\| Dependency Security | OWASP Dependency-Check | Identify vulnerable third-party dependencies |
-
-\| Filesystem Security | Trivy | Scan source files and dependencies |
-
-\| Container Security | Trivy | Scan container images for vulnerabilities and misconfigurations |
-
-\| Image Signing | Cosign | Cryptographically sign production container images |
-
-\| SBOM | Syft | Generate software component inventories |
-
-\| Attestation | GitHub Actions / Cosign | Verify and preserve build provenance evidence |
-
-\| Registry Security | GHCR / Docker Hub | Distribute production container artifacts |
-
-\| Reporting | Nodemailer / Gmail | Deliver automated security and release reports |
-
-**---**
-
-**# 🧰 DevSecOps Toolchain**
-
-\| Category | Technology |
-
-\|---|---|
-
-\| Source Control | Git / GitHub |
-
-\| Branch Management | \`pre-main\` / \`main\` |
-
-\| Commit Signing | GPG |
-
-\| Secret Detection | Gitleaks |
-
-\| CI/CD | GitHub Actions |
-
-\| Static Analysis | SonarCloud |
-
-\| Dependency Security | OWASP Dependency-Check |
-
-\| Filesystem Security | Trivy |
-
-\| Container Security | Trivy |
-
-\| Unit Testing | Jest |
-
-\| E2E Testing | Cypress |
-
-\| Performance Testing | k6 |
-
-\| API Mocking | WireMock |
-
-\| Container Build | Docker Buildx |
-
-\| Image Signing | Cosign |
-
-\| SBOM Generation | Syft |
-
-\| Container Registry | GitHub Container Registry |
-
-\| Container Registry | Docker Hub |
-
-\| Release Reporting | Nodemailer / Gmail |
-
-\| Automation | Bash |
-
-**---**
-
-**# 📦 Supply Chain Security**
-
-The enhanced pipeline strengthens the software supply chain across multiple stages.
-
-**### Source Integrity**
-
-GPG signing establishes cryptographic identity for Git commits and allows GitHub to display verified commits.
-
-**### Secret Hygiene**
-
-Gitleaks continuously checks the repository for accidentally committed credentials, tokens, and other sensitive values.
-
-**### Dependency & Container Security**
-
-SonarCloud, OWASP Dependency-Check, and Trivy provide multiple layers of vulnerability and quality analysis before production release.
-
-**### Artifact Integrity**
-
-Production images are identified using their immutable digests and cryptographically signed using Cosign.
-
-**### Software Transparency**
-
-Syft generates SPDX SBOMs describing the software components included in the production container images.
-
-**### Verifiable Evidence**
-
-Cosign verification, SBOM documents, and attestation records are preserved as machine-readable artifacts.
-
-**### Human-Readable Reporting**
-
-HTML security and release reports are generated and delivered through email, providing an accessible summary of the production release.
-
-**---**
-
-**# 📊 Automated Evidence & Reporting**
-
-The pipeline produces both human-readable and machine-readable security evidence.
-
-**### HTML Reports**
-
-\`\`\`text
-
-Docker Build & Push Report
-
-Docker Security Report
-
-\`\`\`
-
-These reports summarize the production build, registry publication, signing, SBOM generation, and attestation verification.
-
-**### Machine-Readable Evidence**
-
-The pipeline preserves:
-
-\`\`\`text
-
-Cosign JSON
-
-SBOM JSON
-
-Attestation JSON
-
-\`\`\`
-
-These artifacts can be independently inspected rather than relying exclusively on the rendered HTML reports.
-
-This provides a stronger evidence model for the production release because the underlying security metadata remains available for verification.
-
-**---**
-
-**# 🚀 Production Release Flow**
-
-The production release is performed through the \`main\` branch after validation of the \`pre-main\` branch.
-
-The release process follows the general flow:
-
-\`\`\`bash
-
-git checkout main
-
-git merge pre-main
-
-git push origin main
-
-\`\`\`
-
-The production workflow then performs:
-
-\`\`\`text
-
-1\. Build production images
-
-2\. Build linux/amd64 image
-
-3\. Build linux/arm64 image
-
-4\. Push images to GHCR
-
-5\. Push images to Docker Hub
-
-6\. Resolve immutable image digests
-
-7\. Sign images with Cosign
-
-8\. Generate SPDX SBOMs with Syft
-
-9\. Verify attestations
-
-10\. Preserve machine-readable evidence
-
-11\. Generate HTML reports
-
-12\. Send release reports through email
-
-\`\`\`
-
-**---**
-
-**# 📝 Notes**
-
-\- **\*\*GPG\*\*** provides cryptographic commit signing and source authenticity verification.
-
-\- **\*\*Gitleaks\*\*** detects hardcoded secrets before they enter the production supply chain.
-
-\- **\*\*SonarCloud\*\*** performs static analysis and code-quality/security analysis.
-
-\- **\*\*OWASP Dependency-Check\*\*** identifies vulnerable third-party dependencies.
-
-\- **\*\*Trivy\*\*** scans filesystems and container images for vulnerabilities and misconfigurations.
-
-\- **\*\*Jest\*\*** provides automated unit testing and coverage.
-
-\- **\*\*Cypress\*\*** validates end-to-end application behavior.
-
-\- **\*\*WireMock\*\*** isolates external API dependencies during QA.
-
-\- **\*\*k6\*\*** validates smoke-test reliability and sustained load performance.
-
-\- **\*\*Docker Buildx\*\*** enables multi-architecture container builds.
-
-\- **\*\*Cosign\*\*** provides cryptographic container image signing.
-
-\- **\*\*Syft\*\*** generates SPDX Software Bill of Materials.
-
-\- **\*\*Attestation verification\*\*** provides additional supply-chain evidence.
-
-\- **\*\*GHCR and Docker Hub\*\*** distribute the production container images.
-
-\- **\*\*Nodemailer/Gmail\*\*** delivers automated HTML security and release reports.
-
-\- Machine-readable security evidence is preserved as GitHub Actions artifacts.
-
-\- Production image identity is anchored to immutable image digests rather than relying solely on mutable tags.
-
-**---**
-
-**# 🎯 Outcome**
-
-The enhanced Resume Matcher DevSecOps pipeline extends traditional CI/CD into a more verifiable software supply-chain workflow.
-
-Instead of stopping at source-code testing and vulnerability scanning, the pipeline establishes controls across the complete delivery chain:
-
-\`\`\`text
-
-Source
-
-  ↓
-
-Signed Commits
-
-  ↓
-
-Secret Detection
-
-  ↓
-
-Static Analysis
-
-  ↓
-
-Dependency Scanning
-
-  ↓
-
-Filesystem / Container Scanning
-
-  ↓
-
-Automated Testing
-
-  ↓
-
-Quality & Security Gates
-
-  ↓
-
-Production Build
-
-  ↓
-
-Multi-Architecture Images
-
-  ↓
-
-Immutable Image Digest
-
-  ↓
-
-Cosign Image Signing
-
-  ↓
-
-SBOM Generation
-
-  ↓
-
-Attestation Verification
-
-  ↓
-
-Machine-Readable Evidence
-
-  ↓
-
-HTML Release Reporting
-
-  ↓
-
-GHCR + Docker Hub
-
-\`\`\`
-
-The result is a **\*\*security-focused, test-driven, auditable, and verifiable DevSecOps release process\*\*** in which source authenticity, secret hygiene, application quality, dependency security, container security, artifact integrity, software transparency, and release evidence are integrated into a single automated delivery lifecycle.
-
-**---**
-
-\<div *align*="center">
-
-**\*\*© 2026 Kaif. All rights reserved.\*\***
-
-\</div>
-
-**\_\_\_\_\_\_\_\_\_\_\_\_\_**
-
-\<!DOCTYPE html>
-
-\<html lang="en">
-
-\<head>
-
-  \<meta charset="UTF-8" />
-
-  \<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  \<title>Jenkins CI/CD Pipeline Project\</title>
-
-  \<link rel="stylesheet" href="/style.css" />
-
-\</head>
-
-\<body>
-
-  \<aside class="sidebar">
-
-    \<ul>
-
-      \<li>\<a href="/#about">About\</a>\</li>
-
-      \<li>\<a href="/#projects">Projects\</a>\</li>
-
-      \<li>\<a href="/#skills">Skills\</a>\</li>
-
-      \<li>\<a href="/#contact">Contact\</a>\</li>
-
-    \</ul>
-
-  \</aside>
-
-\<section class="hero">
-
-  \<h1>Jenkins DevSecOps CI/CD Pipeline Walkthrough\</h1>
-
-  \<p>
-
-    A comprehensive guide to orchestrating automated end-to-end continuous integration and deployment 
-
-    using Jenkins. From agent node setup and SCM triggers to static analysis, secret scanning, containerization, 
-
-    image signing, Kubernetes deployment, and live application validation.
-
-  \</p>
-
-\</section>
-
-\<section class="section">
-
-  \<h2>Access the walkthrough\</h2>
-
-  \<div class="video-container">
-
-    \<iframe width="560" height="315"
-
-      src="https\://www\.youtube.com/embed/qBbtWlOH5rg?si=y8lQeAAUDfd1_1QU"
-
-      title="Jenkins CI/CD Pipeline Tutorial for Beginners | Node.js, Docker & GitHub Actions Cloud Agents" frameborder="0"
-
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-
-      referrerpolicy="strict-origin-when-cross-origin" allowfullscreen>
-
-    \</iframe>
-
-  \</div>
-
-\</section>
-
-\<section class="section">
-
-  \<h2>Deployment Strategy\</h2>
-
-\<!-- JENKINS 1: Pipeline Architecture & Jenkins Initialization -->
-
-  \<div class="card">
-
-    \<h3>Pipeline Architecture & Jenkins Controller Setup\</h3>
-
-    \<p>
-
-      The DevSecOps pipeline architecture was designed to handle pre-main validation, multi-arch builds, supply chain signing, SBOM generation, and automated reporting.
-
-      The environment was initialized by deploying the official Jenkins LTS Docker container on port 8080 with persistent home volume storage:
-
-    \</p>
-
-    \<pre>\<code># Pull official Jenkins LTS image and run container
-
-docker pull jenkins/jenkins\:lts
-
-docker run -d \\
-
-  --name jenkins \\
-
-  -p 8080:8080 -p 50000:50000 \\
-
-  -v jenkins_home:/var/jenkins_home \\
-
-  jenkins/jenkins\:lts
-
-**# Retrieve initial administrator password**
+docker run -d \
+  --name jenkins \
+  -p 8080:8080 \
+  -p 50000:50000 \
+  -v jenkins_home:/var/jenkins_home \
+  jenkins/jenkins:lts
 
 docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+```
 
-\</code>\</pre>
+Jenkins is then accessed locally through:
 
-    \<p>
+```text
+http://localhost:8080
+```
 
-      After retrieving the initial admin secret via Docker execution, the web interface on \<code>http\://localhost:8080\</code> was unlocked. 
+The initial setup includes:
 
-      Suggested plugins were installed (including Git, Pipeline, SSH Build Agents, and Mailer), followed by configuring the primary admin user profile (\<code>kaifmohammedkhan\</code>).
+- Jenkins LTS initialization
+- Plugin installation
+- Git integration
+- Pipeline support
+- SSH Build Agents
+- Mailer
+- Administrator account configuration
 
-    \</p>
+<div align="center">
 
-    \<div class="image-gallery">
+<img src="images/jenkins/JENKINS 1/jenkins1.png" width="250"/>
+<img src="images/jenkins/JENKINS 1/jenkins2.png" width="250"/>
+<img src="images/jenkins/JENKINS 1/jenkins3.png" width="250"/>
+<img src="images/jenkins/JENKINS 1/jenkins4.png" width="250"/>
+<img src="images/jenkins/JENKINS 1/jenkins5.png" width="250"/>
+<img src="images/jenkins/JENKINS 1/jenkins6.png" width="250"/>
 
-      \<img src="/images/jenkins/JENKINS 1/jenkins1.1.png" alt="DevSecOps Architecture Diagram" />
+</div>
 
-      \<img src="/images/jenkins/JENKINS 1/jenkins1.png" alt="Docker Pull & Container Run" />
+---
 
-      \<img src="/images/jenkins/JENKINS 1/jenkins2.png" alt="Unlock Jenkins Getting Started Page" />
+## Jenkins Pipeline & GitHub SCM
 
-      \<img src="/images/jenkins/JENKINS 1/jenkins3.png" alt="Retrieve Initial Admin Password in Terminal" />
+A dedicated Jenkins Pipeline job is configured for the validation branch:
 
-      \<img src="/images/jenkins/JENKINS 1/jenkins4.png" alt="Customize Jenkins Plugin Selection" />
+```text
+Job:
+resume-matcher-jenkins-premain
 
-      \<img src="/images/jenkins/JENKINS 1/jenkins5.png" alt="Installing Suggested Plugins Progress" />
+Repository:
+https://github.com/kaifmohammedkhan/resume-matcher-devops
 
-      \<img src="/images/jenkins/JENKINS 1/jenkins6.png" alt="Create First Admin User Setup" />
+Branch:
+*/pre-main
 
-    \</div>
+Script Path:
+Jenkinsfile
+```
 
-  \</div>
+The Jenkins pipeline obtains its definition directly from GitHub.
 
-\<!-- JENKINS 2: Pipeline Initialization & SCM Checkout -->
+Example SCM configuration:
 
-  \<div class="card">
+```groovy
+pipeline {
+    agent any
 
-    \<h3>Pipeline Job Configuration & Source Control Integration\</h3>
-
-    \<p>
-
-      A new Pipeline job named \<code>resume-matcher-jenkins-premain\</code> was created in Jenkins and configured to pull its definition dynamically using \<strong>Pipeline script from SCM\</strong> pointing to \<code>https\://github.com/kaifmohammedkhan/resume-matcher-devops\</code> on branch \<code>\*/pre-main\</code>.
-
-    \</p>
-
-    \<p>
-
-      To allow Jenkins to interact securely with GitHub, DockerHub, SonarQube, Cosign, and SMTP services, all required Personal Access Tokens (PATs) and credentials—such as \<code>GITHUB_CRED\</code>—were created in GitHub and registered securely inside the global Jenkins Credential Store.
-
-    \</p>
-
-    \<pre>\<code>pipeline {
-
-    agent any
-
-    stages {
-
-        stage('Checkout SCM') {
-
-            steps {
-
-                git branch: 'pre-main', 
-
-                    credentialsId: 'GITHUB_CRED', 
-
-                    url: 'https\://github.com/kaifmohammedkhan/resume-matcher-devops.git'
-
-            }
-
-        }
-
-    }
-
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                git branch: 'pre-main',
+                    credentialsId: 'GITHUB_CRED',
+                    url: 'https://github.com/kaifmohammedkhan/resume-matcher-devops.git'
+            }
+        }
+    }
 }
+```
 
-\</code>\</pre>
+GitHub authentication is handled through Jenkins Credentials rather than storing authentication material directly inside the pipeline.
 
-    \<p>
+<div align="center">
 
-      The SCM configuration was bound with the newly added credentials (\<code>kaifmohammedkhan/\*\*\*\*\*\*\</code>) to ensure secure checkout of the \<code>Jenkinsfile\</code> from the targeted branch during pipeline runs.
+<img src="images/jenkins/JENKINS 2/jenkins7.png" width="250"/>
+<img src="images/jenkins/JENKINS 2/jenkins8.png" width="250"/>
+<img src="images/jenkins/JENKINS 2/jenkins9.png" width="250"/>
+<img src="images/jenkins/JENKINS 2/jenkins10.png" width="250"/>
+<img src="images/jenkins/JENKINS 2/jenkins11.1.png" width="250"/>
+<img src="images/jenkins/JENKINS 2/jenkins11.2.png" width="250"/>
+<img src="images/jenkins/JENKINS 2/jenkins12.png" width="250"/>
 
-    \</p>
+</div>
 
-    \<div class="image-gallery">
+---
 
-      \<img src="/images/jenkins/JENKINS 2/jenkins7.png" alt="Creating new Pipeline job resume-matcher-jenkins-premain" />
+## Jenkins Controller Tooling
 
-      \<img src="/images/jenkins/JENKINS 2/jenkins8.png" alt="Configuring Pipeline script from SCM with GitHub repo URL" />
+The Jenkins controller environment is prepared with the runtime tools required by the pipeline.
 
-      \<img src="/images/jenkins/JENKINS 2/jenkins9.png" alt="Specifying pre-main branch and Jenkinsfile script path" />
-
-      \<img src="/images/jenkins/JENKINS 2/jenkins10.png" alt="Generating GITHUB_CRED Personal Access Token on GitHub" />
-
-      \<img src="/images/jenkins/JENKINS 2/jenkins11.1.png" alt="Jenkins Global Credentials Store page 1" />
-
-      \<img src="/images/jenkins/JENKINS 2/jenkins11.2.png" alt="Jenkins Global Credentials Store page 2 showing GITHUB_CRED" />
-
-      \<img src="/images/jenkins/JENKINS 2/jenkins12.png" alt="Attaching kaifmohammedkhan credentials to Git SCM configuration" />
-
-    \</div>
-
-  \</div>
-
-
-
-\<!-- JENKINS 3: Jenkins Environment Tooling Setup -->
-
-  \<div class="card">
-
-    \<h3>Jenkins Controller Tooling & Environment Configuration\</h3>
-
-    \<p>
-
-      To enable container management, security scanning, and application testing directly inside the Jenkins controller, necessary runtime packages were installed via root shell access inside the running Jenkins container:
-
-    \</p>
-
-    \<pre>\<code># Access Jenkins container shell as root
-
+```bash
 docker exec -it -u root jenkins /bin/bash
 
-**# Update package repository and install Docker CLI dependencies**
-
 apt-get update
-
 apt-get install -y docker.io
-
-**# Verify Docker CLI installation inside container**
 
 docker --version
 
-**# Install Node.js and NPM runtime environment**
+apt-get update && apt-get install -y nodejs npm
+```
 
-apt-get update &amp;&amp; apt-get install -y nodejs npm
+The environment therefore provides:
 
-\</code>\</pre>
+```text
+Docker
+Node.js
+npm
+Application Test Runtime
+Container Tooling
+Security Tooling
+```
 
-    \<p>
+<div align="center">
 
-      Installing \<code>docker.io\</code>, \<code>nodejs\</code>, and \<code>npm\</code> directly inside the controller container ensured that downstream pipeline stages—including container build workflows, unit tests, secret scanning, and static analysis tools—had all required CLI binaries available natively on the execution host.
+<img src="images/jenkins/JENKINS 3/jenkins15.png" width="250"/>
+<img src="images/jenkins/JENKINS 3/jenkins16.png" width="250"/>
+<img src="images/jenkins/JENKINS 3/jenkins17.png" width="250"/>
 
-    \</p>
+</div>
 
-    \<div class="image-gallery">
+---
 
-      \<img src="/images/jenkins/JENKINS 3/jenkins15.png" alt="Exec into Jenkins container as root and install docker.io via apt-get" />
+## GitHub Actions Cloud Agents
 
-      \<img src="/images/jenkins/JENKINS 3/jenkins16.png" alt="Verify Docker CLI version 26.1.5 installation inside container" />
+The Jenkins environment is extended with **GitHub Actions Cloud Agents** to provide dynamically provisioned execution environments.
 
-      \<img src="/images/jenkins/JENKINS 3/jenkins17.png" alt="Install Node.js and NPM packages inside Jenkins container" />
+The cloud configuration is:
 
-    \</div>
+```text
+Cloud Name       : github-cloud
+Provider         : GitHub Actions
+Repository       : kaifmohammedkhan/resume-matcher-devops
+Credential       : github-agent-token
+Agent Label      : gha-runner
+Remote FS        : /home/runner/agent
+Workflow         : jenkins-agent.yml
+Git Ref          : pre-main
+```
 
-  \</div>
+The execution model is:
 
-\<!-- JENKINS 4: GitHub Actions Cloud Agents Integration -->
+```text
+Jenkins Controller
+       │
+       ▼
+GitHub Actions Cloud Plugin
+       │
+       ▼
+Jenkins Agent Runner Workflow
+       │
+       ▼
+Ephemeral GitHub Actions Runner
+       │
+       ▼
+Jenkins Agent
+       │
+       ▼
+Pipeline Stage
+```
 
-  \<div class="card">
+<div align="center">
 
-    \<h3>GitHub Actions Cloud Agent Provisioning Configuration\</h3>
+<img src="images/jenkins/JENKINS 4/jenkins18.png" width="250"/>
+<img src="images/jenkins/JENKINS 4/jenkins19.png" width="250"/>
+<img src="images/jenkins/JENKINS 4/jenkins20.png" width="250"/>
+<img src="images/jenkins/JENKINS 4/jenkins21.png" width="250"/>
+<img src="images/jenkins/JENKINS 4/jenkins22.png" width="250"/>
+<img src="images/jenkins/JENKINS 4/jenkins23.png" width="250"/>
+<img src="images/jenkins/JENKINS 4/jenkins24.png" width="250"/>
 
-    \<p>
+</div>
 
-      To enable dynamic build execution offloading, Jenkins was configured to provision GitHub Actions Cloud Agents on demand. The \<strong>GitHub Actions Cloud Agents\</strong> plugin was installed, fine-grained Personal Access Tokens (PAT) were stored in Jenkins Credentials, and cloud agent templates were mapped to the repository target branch.
+---
 
-    \</p>
+## Secure zrok Ingress
 
-    \<pre>\<code># Jenkins Cloud Configuration Details:
+Because Jenkins is hosted locally, **zrok** provides an HTTPS ingress endpoint for external GitHub and GitHub Actions communication.
 
-\# Cloud Name:       github-cloud
+```text
+GitHub / GitHub Actions
+          │
+          ▼
+my-jenkins-local.shares.zrok.io
+          │
+          ▼
+         zrok
+          │
+          ▼
+Jenkins :8080
+```
 
-\# Provider Type:    GitHub Actions
+The zrok CLI is installed on the Windows host.
 
-\# Repository:        kaifmohammedkhan/resume-matcher-devops
+```powershell
+New-Item -ItemType Directory -Path "C:\zrok" -Force
 
-\# Secret ID:         github-agent-token
+Invoke-WebRequest `
+  -Uri "https://github.com/openziti/zrok/releases/download/v0.4.42/zrok_0.4.42_windows_amd64.tar.gz" `
+  -OutFile "C:\zrok\zrok.tar.gz"
 
-\# Agent Label:       gha-runner
+tar -xf "C:\zrok\zrok.tar.gz" -C "C:\zrok"
 
-\# Remote FS Root:    /home/runner/agent
-
-\# Workflow File:     jenkins-agent.yml
-
-\# Git Ref:           pre-main
-
-\</code>\</pre>
-
-    \<p>
-
-      This configuration allowed Jenkins pipelines to automatically spawn ephemeral, one-shot GitHub Actions runners on demand, providing isolated execution environments for container builds and security stages.
-
-    \</p>
-
-    \<div class="image-gallery">
-
-      \<img src="/images/jenkins/JENKINS 4/jenkins18.png" alt="Install GitHub Actions Cloud Agents plugin in Jenkins Plugin Manager" />
-
-      \<img src="/images/jenkins/JENKINS 4/jenkins19.png" alt="Generate fine-grained GitHub Personal Access Token with Actions, Contents, and Workflows permissions" />
-
-      \<img src="/images/jenkins/JENKINS 4/jenkins20.png" alt="Add secret text credential github-agent-token in Jenkins Credentials Manager" />
-
-      \<img src="/images/jenkins/JENKINS 4/jenkins21.png" alt="Create new cloud provider instance named github-cloud using GitHub Actions type" />
-
-      \<img src="/images/jenkins/JENKINS 4/jenkins22.png" alt="Configure cloud details with repository path and github-agent-token credentials" />
-
-      \<img src="/images/jenkins/JENKINS 4/jenkins23.png" alt="Define cloud agent template gha-runner with jenkins-agent.yml workflow file" />
-
-      \<img src="/images/jenkins/JENKINS 4/jenkins24.png" alt="Set Git Ref target branch to pre-main for one-shot agent dispatch" />
-
-    \</div>
-
-  \</div>
-
-\<!-- JENKINS 5: Tunneling & Ingress Setup with zrok -->
-
-  \<div class="card">
-
-    \<h3>Secure Ingress & Tunneling Setup with zrok\</h3>
-
-    \<p>
-
-      To expose the local Jenkins instance securely to external webhooks and GitHub Actions agent callbacks, 
-
-      \<strong>zrok\</strong> was installed and initialized on the host machine. An environment token was generated 
-
-      via the zrok portal and activated using the zrok CLI[cite: 25, 27].
-
-    \</p>
-
-    \<pre>\<code># Download and extract zrok binary on Windows PowerShell
-
-New-Item -ItemType Directory -Path "C:\zrok" -Force; Invoke-WebRequest -Uri "https\://github.com/openziti/zrok/releases/download/v0.4.42/zrok_0.4.42_windows_amd64.tar.gz" -OutFile "C:\zrok\zrok.tar.gz"; tar -xf "C:\zrok\zrok.tar.gz" -C "C:\zrok"; Remove-Item "C:\zrok\zrok.tar.gz"
-
-**# Verify zrok CLI installation**
+Remove-Item "C:\zrok\zrok.tar.gz"
 
 C:\zrok\zrok.exe version
 
-**# Enable zrok environment with account token**
+C:\zrok\zrok.exe enable <zrok-token>
+```
 
-C:\zrok\zrok.exe enable &lt;zrok-token&gt;
+<div align="center">
 
-\</code>\</pre>
+<img src="images/jenkins/JENKINS 5/jenkins25.1.png" width="250"/>
+<img src="images/jenkins/JENKINS 5/jenkins25.2.png" width="250"/>
+<img src="images/jenkins/JENKINS 5/jenkins25.3.png" width="250"/>
 
-    \<p>
+</div>
 
-      Once enabled, zrok established a persistent secure tunnel, allowing cloud-hosted GitHub Actions workflows 
+---
 
-      to communicate back to the local Jenkins controller seamlessly during pipeline executions[cite: 25, 27].
+## Persistent zrok Share
 
-    \</p>
+A named zrok share provides the stable public Jenkins endpoint:
 
-    \<div class="image-gallery">
+```text
+my-jenkins-local.shares.zrok.io
+```
 
-      \<img src="/images/jenkins/JENKINS 5/jenkins25.1.png" alt="Successfully created zrok account credentials and environment enable command" />
+The repository automation script:
 
-      \<img src="/images/jenkins/JENKINS 5/jenkins25.2.png" alt="Download zrok v0.4.42 release binary and verify CLI version via PowerShell" />
+```bash
+chmod +x jenkins.sh
+./jenkins.sh
+```
 
-      \<img src="/images/jenkins/JENKINS 5/jenkins25.3.png" alt="Execute zrok enable command to successfully initialize zrok environment" />
+handles the share lifecycle.
 
-    \</div>
+The resulting Jenkins URL is:
 
-  \</div>
+```text
+https://my-jenkins-local.shares.zrok.io/
+```
 
-\<!-- JENKINS 6: zrok Reserved Share Automation & Jenkins Location Binding -->
+This endpoint is configured as the Jenkins Location URL.
 
-  \<div class="card">
+<div align="center">
 
-    \<h3>zrok Reserved Share Automation &amp; Jenkins Location Binding\</h3>
+<img src="images/jenkins/JENKINS 6/jenkins25.4.png" width="250"/>
+<img src="images/jenkins/JENKINS 6/jenkins25.5.png" width="250"/>
+<img src="images/jenkins/JENKINS 6/jenkins25.6.png" width="250"/>
+<img src="images/jenkins/JENKINS 6/jenkins26.2.png" width="250"/>
+<img src="images/jenkins/JENKINS 6/jenkins27.jpg" width="250"/>
 
-    \<p>
+</div>
 
-      To ensure a persistent, static public URL for incoming GitHub webhooks and agent callbacks, a automation script 
+---
 
-      (\<code>jenkins.sh\</code>) was executed to establish a named zrok share (\<code>my-jenkins-local\</code>)[cite: 28, 29, 30]. The generated public endpoint 
+## Jenkins API & Parameterized Builds
 
-      (\<code>https\://my-jenkins-local.shares.zrok.io\</code>) was then bound as the primary Jenkins Location URL[cite: 30, 31, 32].
+The Jenkins environment also supports external API-triggered builds.
 
-    \</p>
+A dedicated Jenkins API token is configured for GitHub Actions communication.
 
-    \<pre>\<code># Execute zrok share reset &amp; reservation script
+GitHub repository secrets include:
 
-chmod +x jenkins.sh &amp;&amp; ./jenkins.sh
+```text
+JENKINS_URL
+JENKINS_USER
+JENKINS_TOKEN
+```
 
-**# Script output:**
+The production job is parameterized using:
+
+```text
+PR_NUMBER
+BRANCH_NAME
+```
+
+The resulting integration is:
+
+```text
+GitHub Actions
+      │
+      │ Jenkins API
+      ▼
+Jenkins
+      │
+      ▼
+Parameterized Pipeline
+      │
+      ├── PR_NUMBER
+      └── BRANCH_NAME
+```
+
+<div align="center">
 
-**# Starting zrok share reset sequence...**
+<img src="images/jenkins/JENKINS 8/jenkins32.1.png" width="250"/>
+<img src="images/jenkins/JENKINS 8/jenkins32.2.png" width="250"/>
+<img src="images/jenkins/JENKINS 8/jenkins32.3.png" width="250"/>
+<img src="images/jenkins/JENKINS 8/jenkins32.4.png" width="250"/>
+<img src="images/jenkins/JENKINS 8/jenkins32.5.png" width="250"/>
+<img src="images/jenkins/JENKINS 8/jenkins32.6.png" width="250"/>
+<img src="images/jenkins/JENKINS 8/jenkins32.7.png" width="250"/>
+<img src="images/jenkins/JENKINS 8/jenkins32.8.png" width="250"/>
+<img src="images/jenkins/JENKINS 8/jenkins32.9.png" width="250"/>
 
-**# [INFO] Releasing reserved name...**
+</div>
 
-**# [INFO] Creating reserved name 'my-jenkins-local' in namespace 'public'**
+---
+
+# Step 2: Secure Validation, QA, Security Scanning & Automated Reporting
+
+The second stage implements the complete **pre-main validation lifecycle**.
+
+The local automation entry point is:
 
-**# [INFO] Starting named share at my-jenkins-local.shares.zrok.io**
+```bash
+./premain.sh
+```
 
-**# Configure Jenkins Location URL via UI System Settings:**
+The script synchronizes the local working tree with the validation branch and pushes the resulting state to GitHub.
 
-**# Jenkins URL: https\://my-jenkins-local.shares.zrok.io/**
+The push triggers:
 
-\</code>\</pre>
+```text
+resume-matcher-jenkins-premain
+```
 
-    \<p>
+The Jenkins pipeline then executes CI, security, QA, static analysis, container scanning, secret detection and reporting.
 
-      This guaranteed that Jenkins could receive webhook events from GitHub and remain fully accessible over secure SSL HTTPS, even across container restarts or IP address changes[cite: 29, 31, 32].
+---
 
-    \</p>
+## Pre-main Validation Pipeline
 
-    \<div class="image-gallery">
+```text
+Developer Changes
+       │
+       ▼
+./premain.sh
+       │
+       ▼
+GitHub pre-main
+       │
+       ▼
+Jenkins
+       │
+       ├───────────────┬───────────────┐
+       │               │               │
+       ▼               ▼               ▼
+     CI Job         OWASP Job        QA Job
+       │               │               │
+       │               │               ├── Cypress
+       │               │               ├── k6
+       │               │               └── PostgreSQL
+       │               │
+       │               └── Dependency Check
+       │
+       ├── Tests
+       ├── Lint
+       └── Build
+               │
+               ▼
+         SonarCloud
+               │
+               ▼
+             Trivy
+               │
+               ├── Filesystem
+               └── Image
+               │
+               ▼
+           Gitleaks
+               │
+               ▼
+       Report Consolidation
+               │
+               ▼
+        Email Notification
+```
 
-      \<img src="/images/jenkins/JENKINS 6/jenkins25.4.png" alt="Repository workspace files showing jenkins.sh automation script" />
+---
 
-      \<img src="/images/jenkins/JENKINS 6/jenkins25.5.png" alt="Execute jenkins.sh to trigger zrok reserved share creation for my-jenkins-local" />
+## CI Validation
 
-      \<img src="/images/jenkins/JENKINS 6/jenkins25.6.png" alt="zrok TUI proxy monitor active for my-jenkins-local.shares.zrok.io" />
+The CI stage validates the application using the project's automated test and build tooling.
 
-      \<img src="/images/jenkins/JENKINS 6/jenkins26.2.png" alt="Set Jenkins URL to https\://my-jenkins-local.shares.zrok.io/ in System Configuration" />
+The validation layer includes:
 
-      \<img src="/images/jenkins/JENKINS 6/jenkins27.jpg" alt="Access Jenkins login portal securely over zrok HTTPS domain" />
+```text
+Unit Tests
+Linting
+Application Build
+Coverage Reporting
+```
 
-    \</div>
+The generated CI evidence is preserved as Jenkins artifacts.
 
-  \</div>
+---
 
-\<!-- JENKINS 7: Ephemeral GitHub Actions Agent Provisioning & Orchestration -->
+## OWASP Dependency Security
 
-  \<div class="card">
+The OWASP stage performs dependency vulnerability analysis using:
 
-    \<h3>Ephemeral GitHub Actions Agent Provisioning &amp; Orchestration\</h3>
+```text
+OWASP Dependency-Check
+```
 
-    \<p>
+The resulting security evidence is consolidated into the pipeline reporting process.
 
-      To offload workload execution from the main Jenkins controller, dynamic agent provisioning was configured via 
+---
 
-      the \<strong>github-cloud\</strong> integration[cite: 33, 35]. Jenkins orchestrates build jobs by dynamically triggering 
+## SonarCloud Static Analysis
 
-      the \<code>Jenkins Agent Runner\</code> workflow hosted on GitHub Actions[cite: 33, 34].
+SonarCloud provides static code analysis for the project.
 
-    \</p>
+The Jenkins pipeline executes SonarCloud after the test stage so that code-quality and security analysis can be associated with the current validated source state.
 
-    \<pre>\<code>// Jenkinsfile agent configuration snippet
+---
 
-agent {
+## Trivy Security Scanning
 
-    node {
+Trivy is used at multiple points in the pipeline.
 
-        label 'github-actions-runner'
+```text
+Trivy
+ │
+ ├── Filesystem Scan
+ │
+ └── Container Image Scan
+```
 
-    }
+The resulting reports are preserved for pipeline evidence.
 
-}
+---
 
-// Workflow invocation process:
+## Gitleaks Secret Detection
 
-// 1. Jenkins triggers 'Jenkins Agent Runner' via GitHub API / Cloud plugin
+Gitleaks provides source-level secret detection.
 
-// 2. Ephemeral GitHub Actions runner spins up and connects back to Jenkins controller
+The purpose is to identify accidentally committed:
 
-// 3. Pipeline stage execution offloaded to GitHub Actions runner environment
+```text
+API Keys
+Tokens
+Passwords
+Credentials
+Private Secrets
+```
 
-\</code>\</pre>
+before the source state proceeds through the release lifecycle.
 
-    \<p>
+---
 
-      The status and health of the cloud agent provisioner are tracked directly within Jenkins system statistics, 
+## QA Validation
 
-      ensuring continuous execution capability across automated pipeline runs.
+The QA path includes:
 
-    \</p>
+```text
+Cypress
+k6
+PostgreSQL
+WireMock
+```
 
-    \<div class="image-gallery">
+Cypress performs browser-based end-to-end validation.
 
-      \<img src="/images/jenkins/JENKINS 7/jenkins30.1.png" alt="Jenkins test-gha-agent job stage view showing successful Verify Provisioning execution" />
+k6 provides smoke and load testing.
 
-      \<img src="/images/jenkins/JENKINS 7/jenkins30.2.png" alt="GitHub Actions dashboard listing triggered Jenkins Agent Runner workflows" />
+PostgreSQL supports the application/QA database workflow, while WireMock is used to isolate external API dependencies during testing.
 
-      \<img src="/images/jenkins/JENKINS 7/jenkins31.png" alt="Jenkins Cloud statistics dashboard for github-cloud provider health" />
+---
 
-    \</div>
+## Automated HTML Reporting
 
-  \</div>
+The pre-main pipeline consolidates its results into multiple HTML reports.
 
-\<!-- JENKINS 8: API Authentication, Secrets Configuration & Parameterized Pipeline Setup -->
+The documented report set includes:
 
-  \<div class="card">
+```text
+test-summary-report
+sonar-summary-report
+trivy-fs-report
+trivy-img-report
+security-report
+dependency-check-report
+```
 
-    \<h3>API Authentication, Secrets Configuration &amp; Parameterized Pipeline Setup\</h3>
+These reports are archived and distributed through automated email.
 
-    \<p>
+<div align="center">
 
-      To enable secure bidirectional communication between GitHub Actions and the Jenkins controller, a dedicated API token 
+<img src="images/jenkins/JENKINS 9/jenkins32.10.png" width="250"/>
+<img src="images/jenkins/JENKINS 9/jenkins32.png" width="250"/>
+<img src="images/jenkins/JENKINS 9/jenkins33.png" width="250"/>
+<img src="images/jenkins/JENKINS 9/jenkins34.png" width="250"/>
+<img src="images/jenkins/JENKINS 9/jenkins35.png" width="250"/>
+<img src="images/jenkins/JENKINS 9/jenkins36.png" width="250"/>
 
-      (\<code>GitHub-Actions-PR\</code>) was generated under user security settings[cite: 36, 37, 38]. Corresponding secrets—including 
+</div>
 
-      \<code>JENKINS_URL\</code>, \<code>JENKINS_USER\</code>, and \<code>JENKINS_TOKEN\</code>—were securely configured in the GitHub repository settings[cite: 39, 40, 41].
+---
 
-    \</p>
+# Step 3: Production Container Build, Signing, SBOM & Supply-Chain Verification
 
-    \<pre>\<code>// GitHub Repository Actions Secrets:
+The third stage is the production release path.
 
-// - JENKINS_URL   : https\://my-jenkins-local.shares.zrok.io
+The production Jenkins job:
 
-// - JENKINS_USER  : kaifmohammedkhan
+```text
+resume-matcher-main
+```
 
-// - JENKINS_TOKEN : &lt;generated-api-token&gt;
+is configured against:
 
-// Jenkins Job Configuration: Parameterized Pipeline
+```text
+Branch:
+*/main
 
-// Parameters created:
+Script Path:
+Jenkinsfile
+```
 
-// - String Parameter: PR_NUMBER
+The production lifecycle extends container publication with image signing, SBOM generation, attestation verification and machine-readable security evidence.
 
-// - String Parameter: BRANCH_NAME
+---
 
-\</code>\</pre>
+## Production Pipeline
 
-    \<p>
+```text
+pre-main Validation
+        │
+        ▼
+       main
+        │
+        ▼
+resume-matcher-main
+        │
+        ├── Checkout
+        ├── Environment Setup
+        ├── Docker Buildx
+        ├── Multi-Architecture Build
+        ├── GHCR Push
+        ├── Docker Hub Push
+        ├── Image Digest Capture
+        ├── Cosign Signing
+        ├── SPDX SBOM Generation
+        ├── Attestation Verification
+        ├── Security Evidence
+        └── Email Report
+```
 
-      Additionally, the Jenkins pipeline (\<code>resume-matcher-main\</code>) was parameterized to accept build metadata such as \<code>PR_NUMBER\</code> and \<code>BRANCH_NAME\</code>[cite: 42, 43]. This allows automated GitHub Actions workflow triggers (defined in \<code>.github/workflows\</code>) to programmatically invoke Jenkins builds with precise contextual arguments[cite: 39, 42, 44].
+---
 
-    \</p>
+## Multi-Architecture Docker Build
 
-    \<div class="image-gallery">
+Production container images are built for:
 
-      \<img src="/images/jenkins/JENKINS 8/jenkins32.1.png" alt="Jenkins User Security page prior to API token creation" />
+```text
+linux/amd64
+linux/arm64
+```
 
-      \<img src="/images/jenkins/JENKINS 8/jenkins32.2.png" alt="Creating new non-expiring API token named GitHub-Actions-PR in Jenkins" />
+The resulting architecture manifest allows the published image to support both target platforms.
 
-      \<img src="/images/jenkins/JENKINS 8/jenkins32.3.png" alt="Generated Jenkins API token confirmation dialog" />
+```text
+                 Docker Buildx
+                      │
+          ┌───────────┴───────────┐
+          │                       │
+          ▼                       ▼
+      linux/amd64             linux/arm64
+          │                       │
+          └───────────┬───────────┘
+                      │
+                      ▼
+              Multi-Arch Image
+                      │
+             ┌────────┴────────┐
+             ▼                 ▼
+           GHCR            Docker Hub
+```
 
-      \<img src="/images/jenkins/JENKINS 8/jenkins32.4.png" alt="Adding JENKINS_URL secret in GitHub repository Actions settings" />
+---
 
-      \<img src="/images/jenkins/JENKINS 8/jenkins32.5.png" alt="Adding JENKINS_USER secret in GitHub repository Actions settings" />
+## Docker Registry Publishing
 
-      \<img src="/images/jenkins/JENKINS 8/jenkins32.6.png" alt="Adding JENKINS_TOKEN secret in GitHub repository Actions settings" />
+The production image is published to both:
 
-      \<img src="/images/jenkins/JENKINS 8/jenkins32.7.png" alt="Configuring parameterized build options in Jenkins job setup" />
+```text
+GitHub Container Registry
+Docker Hub
+```
 
-      \<img src="/images/jenkins/JENKINS 8/jenkins32.8.png" alt="Defining PR_NUMBER and BRANCH_NAME String Parameters in job config" />
+The pipeline captures image identity and verification information after publication.
 
-      \<img src="/images/jenkins/JENKINS 8/jenkins32.9.png" alt="GitHub workflow directory listing showing jenkins-main.yaml and jenkins-premain.yaml triggers" />
+---
 
-    \</div>
+## Immutable Image Digest
 
-  \</div>
+The production pipeline records the immutable image digest.
 
-\<!-- JENKINS 9: Automated Script Trigger, Pipeline Stage Execution & Email Artifact Notifications -->
+An example from the documented pipeline evidence is:
 
-  \<div class="card">
+```text
+Repository:
+kaifmohammedkhan/resume-matcher-devops
 
-    \<h3>Automated Script Trigger, Pipeline Stage Execution &amp; Email Artifact Notifications\</h3>
+Digest:
+sha256:661afae7ba52164864492b48b5cfed3eb3890b854c65952b44ed364fae98a72f
+```
 
-    \<p>
+The digest identifies the exact image artifact associated with that particular pipeline execution.
 
-      The release process is initiated locally using a helper script (\<code>./premain.sh\</code>) to automatically reconcile working branch states, perform auto-stashing, merge changes into the target deployment branch, and push commits to GitHub. This remote push triggers the Jenkins pipeline (\<code>resume-matcher-jenkins-premain\</code>)[cite: 45, 46].
+---
 
-    \</p>
+## Cosign Image Signing
 
-    \<pre>\<code># Helper Script Trigger Execution & Git Sync:
+Cosign is configured in Jenkins using:
 
-$ ./premain.sh
+```text
+COSIGN_PRIVATE_KEY
+COSIGN_PASSPHRASE
+```
 
-\# Checks working directory, auto-stashes changes, switches branch, 
+The private key is stored as a Jenkins Secret File and the passphrase is stored as Secret Text.
 
-\# merges pre-main changes, commits, and pushes to GitHub.
+The signing process is:
 
-**# Triggers Jenkins Pipeline Job: resume-matcher-jenkins-premain**
+```text
+Published Image
+      │
+      ▼
+Immutable Digest
+      │
+      ▼
+Cosign Sign
+      │
+      ▼
+Container Signature
+      │
+      ▼
+Verification Evidence
+```
 
-**# Executing stages: Parallel Jobs, CI Job, OWASP Job, QA Job, SonarCloud Analysis,**
+Cosign therefore provides a cryptographic mechanism for associating the release signature with the published image identity.
 
-**# Trivy FS/Image Scans, Gitleaks, and Send Email Job.**
+---
 
-\</code>\</pre>
+## SPDX SBOM Generation
 
-    \<p>
+Syft is used to generate Software Bill of Materials documents for the production container images.
 
-      Upon completion of all pipeline stages—including parallel test suites, OWASP Dependency-Check, SonarCloud analysis, and Trivy filesystem/container scans—the pipeline consolidates generated security and test artifacts and sends an automated email report with HTML attachments to stakeholders[cite: 46, 47, 48, 49, 50].
+The generated SBOMs use the:
 
-    \</p>
+```text
+SPDX
+```
 
-    \<div class="image-gallery">
+format.
 
-      \<img src="/images/jenkins/JENKINS 9/jenkins32.10.png" alt="Executing helper script in Git Bash terminal to sync and push changes to GitHub" />
+The SBOM provides machine-readable information describing the software components present within the published image.
 
-      \<img src="/images/jenkins/JENKINS 9/jenkins32.png" alt="Jenkins Pipeline Stage View showing build #58 status and initial stages" />
+The pipeline preserves registry-specific SBOM evidence:
 
-      \<img src="/images/jenkins/JENKINS 9/jenkins33.png" alt="Jenkins Pipeline Stage View middle stages including OWASP Dependency Check and SonarCloud Analysis" />
+```text
+sbom-ghcr.json
+sbom-dockerhub.json
+```
 
-      \<img src="/images/jenkins/JENKINS 9/jenkins34.png" alt="Jenkins Pipeline Stage View final stages including Trivy scans, Gitleaks, and Send Email Job" />
+---
 
-      \<img src="/images/jenkins/JENKINS 9/jenkins35.png" alt="Gmail notification for CI Pipeline Reports showing execution status for pre-main branch" />
+## Attestation Verification
 
-      \<img src="/images/jenkins/JENKINS 9/jenkins36.png" alt="Gmail notification attachments including test-summary, sonar-summary, trivy, security, and dependency-check reports" />
+The production pipeline also verifies and preserves attestation information associated with the released container artifacts.
 
-    \</div>
+The documented evidence includes:
 
-  \</div>
+```text
+attestation-verify-ghcr.json
+attestation-verify-dockerhub.json
+```
 
-\<!-- JENKINS 10: Production Job SCM Configuration, Cosign CLI Installation & Signing Credentials -->
+This allows the underlying verification evidence to be retained alongside the human-readable reports.
 
-  \<div class="card">
+---
 
-    \<h3>Production Job SCM Configuration, Cosign CLI Installation &amp; Signing Credentials\</h3>
+## Machine-Readable Security Evidence
 
-    \<p>
+The production workflow preserves:
 
-      To support the main production release pipeline (\<code>resume-matcher-main\</code>), SCM settings were configured to point directly to the \<code>\*/main\</code> branch with SCM-managed \<code>Jenkinsfile\</code> execution. On the build host, Cosign was installed and configured locally under user binaries to enable digital signing and verification of container images pushed during pipeline execution.
+```text
+Cosign Verification
+SBOM
+Attestation Verification
+Image Metadata
+Digest Information
+```
 
-    \</p>
+Example artifacts include:
 
-    \<pre>\<code># Jenkins Job SCM Configuration:
+```text
+cosign-verify-ghcr.json
+cosign-verify-dockerhub.json
 
-\# - Repository URL : https\://github.com/kaifmohammedkhan/resume-matcher-devops
+attestation-verify-ghcr.json
+attestation-verify-dockerhub.json
 
-\# - Branch Specifier : \*/main
+sbom-ghcr.json
+sbom-dockerhub.json
+```
 
-\# - Script Path      : Jenkinsfile
+---
 
-**# Cosign Binary Setup (Git Bash / Local Host):**
+## Docker Build & Security Reports
 
-$ curl -sSL "https\://github.com/sigstore/cosign/releases/latest/download/cosign-windows-amd64.exe" -o cosign.exe
+The production pipeline generates HTML reporting for both the build/publishing process and the associated security evidence.
 
-$ mkdir -p \~/bin && mv cosign.exe \~/bin/cosign
+```text
+docker-build-push-report.html
+docker-security-report.html
+```
 
-$ cosign version
+The reports document information such as:
 
-\</code>\</pre>
-
-    \<p>
-
-      Additionally, security credentials required for non-interactive image signing—specifically \<code>COSIGN_PASSPHRASE\</code> (Secret text) and \<code>COSIGN_PRIVATE_KEY\</code> (Secret file referencing \<code>cosign.key\</code>)—were securely added to Jenkins Global Credentials.
-
-    \</p>
-
-    \<div class="image-gallery">
-
-      \<img src="/images/jenkins/JENKINS 10/jenkins37.png" alt="Configuring Git repository SCM URL and credentials in resume-matcher-main job settings" />
-
-      \<img src="/images/jenkins/JENKINS 10/jenkins38.png" alt="Setting branch specifier to \*/main and Script Path to Jenkinsfile in job configuration" />
-
-      \<img src="/images/jenkins/JENKINS 10/jenkins39.png" alt="Downloading and installing Cosign CLI v3.1.3 binary in Git Bash terminal" />
-
-      \<img src="/images/jenkins/JENKINS 10/jenkins40.png" alt="Adding COSIGN_PASSPHRASE Secret text credential in Jenkins Manage Credentials" />
-
-      \<img src="/images/jenkins/JENKINS 10/jenkins41.png" alt="Uploading cosign.key as COSIGN_PRIVATE_KEY Secret file in Jenkins Manage Credentials" />
-
-    \</div>
-
-  \</div>
-
-\<!-- JENKINS 11: End-to-End Build Execution, Stage View & Email Security Reports -->
-
-  \<div class="card">
-
-    \<h3>End-to-End Build Execution, Stage View &amp; Email Security Reports\</h3>
-
-    \<p>
-
-      The \<code>resume-matcher-main\</code> production pipeline run (#40) was executed through to full completion[cite: 56, 57]. The build sequence encompassed multi-architecture Docker image compilation, multi-registry publishing (GHCR &amp; Docker Hub), Cosign container signing, SPDX SBOM generation, and independent attestation verification across both target registries[cite: 56, 60, 61, 62].
-
-    \</p>
-
-    \<pre>\<code># Jenkins Pipeline Artifacts & Security Evidence Archival
-
-Artifacts:
-
-  - docker-build-push-report.html
-
-  - docker-security-report.html
-
-  - cosign-verify-ghcr.json / cosign-verify-dockerhub.json
-
-  - attestation-verify-ghcr.json / attestation-verify-dockerhub.json
-
-  - sbom-ghcr.json / sbom-dockerhub.json
-
-\# Image Digest Anchored in Pipeline Report:
-
-Repository : kaifmohammedkhan/resume-matcher-devops
-
-Digest     : sha256:661afae7ba52164864492b48b5cfed3eb3890b854c65952b44ed364fae98a72f
-
-\</code>\</pre>
-
-    \<p>
-
-      Upon successfully passing all verification checks, Jenkins generated and dispatched an automated HTML email report summarizing the build, image digests, Cosign signatures, and SBOM attestations, attaching raw security evidence files directly for compliance auditability.
-
-    \</p>
-
-    \<div class="image-gallery">
-
-      \<img src="/images/jenkins/JENKINS 11/jenkins42.png" alt="Jenkins job status showing Build #40 artifacts and archived security reports" />
-
-      \<img src="/images/jenkins/JENKINS 11/jenkins43.png" alt="Stage View showing initial checkout, setup, and registry authentication stages" />
-
-      \<img src="/images/jenkins/JENKINS 11/jenkins44.png" alt="Stage View displaying Docker build, push, and evidence preservation stages" />
-
-      \<img src="/images/jenkins/JENKINS 11/jenkins45.png" alt="Stage View rendering Cosign and Syft CLI tool initialization stages" />
-
-      \<img src="/images/jenkins/JENKINS 11/jenkins46.png" alt="Stage View covering image verification, Cosign signing, and SPDX SBOM generation" />
-
-      \<img src="/images/jenkins/JENKINS 11/jenkins47.png" alt="Stage View showing final SBOM attestation, report packaging, and email notification stages" />
-
-      \<img src="/images/jenkins/JENKINS 11/jenkins48.png" alt="Automated Docker Build, Push & Security Report email notification body" />
-
-      \<img src="/images/jenkins/JENKINS 11/jenkins49.png" alt="Email report footer displaying canonical image digest and security report attachments" />
-
-    \</div>
-
-  \</div>
-
-\</section>
-
-  \<footer class="footer">
-
-    \<p>&copy; 2026 Kaif. All rights reserved.\</p>
-
-  \</footer>
-
-\</body>
-
-\</html>
+- Multi-architecture build status
+- GHCR publication
+- Docker Hub publication
+- Image identity
+- Image digest
+- Cosign signing
+- SBOM generation
+- Attestation verification
+- Security evidence
+
+The reports and raw evidence are then included in the automated release notification.
+
+<div align="center">
+
+<img src="images/jenkins/JENKINS 10/jenkins37.png" width="250"/>
+<img src="images/jenkins/JENKINS 10/jenkins38.png" width="250"/>
+<img src="images/jenkins/JENKINS 10/jenkins39.png" width="250"/>
+<img src="images/jenkins/JENKINS 10/jenkins40.png" width="250"/>
+<img src="images/jenkins/JENKINS 10/jenkins41.png" width="250"/>
+
+</div>
+
+<div align="center">
+
+<img src="images/jenkins/JENKINS 11/jenkins42.png" width="250"/>
+<img src="images/jenkins/JENKINS 11/jenkins43.png" width="250"/>
+<img src="images/jenkins/JENKINS 11/jenkins44.png" width="250"/>
+<img src="images/jenkins/JENKINS 11/jenkins45.png" width="250"/>
+<img src="images/jenkins/JENKINS 11/jenkins46.png" width="250"/>
+<img src="images/jenkins/JENKINS 11/jenkins47.png" width="250"/>
+<img src="images/jenkins/JENKINS 11/jenkins48.png" width="250"/>
+<img src="images/jenkins/JENKINS 11/jenkins49.png" width="250"/>
+
+</div>
+
+---
+
+# 🔄 End-to-End Jenkins DevSecOps Pipeline
+
+```text
+Developer Changes
+       │
+       ▼
+   GitHub pre-main
+       │
+       ▼
+    premain.sh
+       │
+       ▼
+     Jenkins
+       │
+       ├── CI
+       │    ├── Tests
+       │    ├── Lint
+       │    └── Build
+       │
+       ├── OWASP
+       │    └── Dependency Check
+       │
+       ├── QA
+       │    ├── Cypress
+       │    ├── k6
+       │    ├── PostgreSQL
+       │    └── WireMock
+       │
+       ├── SonarCloud
+       │
+       ├── Trivy
+       │    ├── Filesystem
+       │    └── Image
+       │
+       └── Gitleaks
+              │
+              ▼
+       Validation Evidence
+              │
+              ▼
+          Validation
+           Complete
+              │
+              ▼
+             main
+              │
+              ▼
+      Jenkins Production Job
+              │
+              ▼
+        Docker Buildx
+              │
+       ┌──────┴──────┐
+       ▼             ▼
+    amd64           arm64
+       │             │
+       └──────┬──────┘
+              │
+              ▼
+       Multi-Arch Image
+              │
+       ┌──────┴──────┐
+       ▼             ▼
+      GHCR       Docker Hub
+       │             │
+       └──────┬──────┘
+              │
+              ▼
+       Immutable Digest
+              │
+              ▼
+        Cosign Signing
+              │
+              ▼
+         Syft / SPDX
+              │
+              ▼
+     Attestation Verification
+              │
+              ▼
+    Machine-Readable Evidence
+              │
+              ▼
+       HTML Security Reports
+              │
+              ▼
+        Email Notification
+```
+
+---
+
+# 🔐 DevSecOps Security Controls
+
+| Security Layer | Technology | Purpose |
+|---|---|---|
+| Source Control | GitHub | Version-controlled source |
+| CI/CD Orchestration | Jenkins | Pipeline automation |
+| Cloud Execution | GitHub Actions Cloud | Ephemeral pipeline agents |
+| Secure Ingress | zrok | HTTPS access to local Jenkins |
+| Unit Testing | Jest | Automated application testing |
+| E2E Testing | Cypress | Browser-based validation |
+| Performance Testing | k6 | Smoke and load testing |
+| API Isolation | WireMock | External service mocking |
+| Dependency Security | OWASP Dependency-Check | Dependency vulnerability analysis |
+| Static Analysis | SonarCloud | Code quality and security analysis |
+| Secret Detection | Gitleaks | Hardcoded secret detection |
+| Filesystem Scanning | Trivy | Source/dependency scanning |
+| Container Scanning | Trivy | Container vulnerability scanning |
+| Container Build | Docker Buildx | Multi-platform images |
+| Registry | GHCR | Container distribution |
+| Registry | Docker Hub | Container distribution |
+| Image Signing | Cosign | Cryptographic artifact signing |
+| SBOM | Syft / SPDX | Software component inventory |
+| Attestation | Verification Evidence | Supply-chain metadata verification |
+| Reporting | HTML / JSON | Human and machine-readable evidence |
+| Notification | Email | Automated report distribution |
+
+---
+
+# 🧰 Jenkins DevSecOps Toolchain
+
+| Category | Technology |
+|---|---|
+| CI/CD | Jenkins |
+| SCM | Git / GitHub |
+| Cloud Agents | GitHub Actions |
+| Secure Ingress | zrok |
+| Application Runtime | Node.js |
+| Package Manager | npm |
+| Unit Testing | Jest |
+| E2E Testing | Cypress |
+| Performance Testing | k6 |
+| Database | PostgreSQL |
+| API Mocking | WireMock |
+| Static Analysis | SonarCloud |
+| Dependency Security | OWASP Dependency-Check |
+| Filesystem Security | Trivy |
+| Container Security | Trivy |
+| Secret Detection | Gitleaks |
+| Container Build | Docker Buildx |
+| Image Signing | Cosign |
+| SBOM | Syft / SPDX |
+| Container Registry | GHCR |
+| Container Registry | Docker Hub |
+| Reporting | HTML / JSON |
+| Notifications | SMTP / Email |
+| Automation | Bash |
+
+---
+
+# 📦 Security & Reporting Evidence
+
+## Pre-main Reports
+
+```text
+test-summary-report
+sonar-summary-report
+trivy-fs-report
+trivy-img-report
+security-report
+dependency-check-report
+```
+
+## Production Reports
+
+```text
+docker-build-push-report.html
+docker-security-report.html
+```
+
+## Supply-Chain Evidence
+
+```text
+cosign-verify-ghcr.json
+cosign-verify-dockerhub.json
+
+attestation-verify-ghcr.json
+attestation-verify-dockerhub.json
+
+sbom-ghcr.json
+sbom-dockerhub.json
+```
+
+---
+
+# 🔑 Jenkins Credential Model
+
+The pipeline keeps authentication material outside the Jenkinsfile and accesses it through Jenkins Credentials.
+
+The documented credential categories include:
+
+```text
+GitHub
+├── GITHUB_CRED
+└── github-agent-token
+
+Docker
+├── DOCKERHUB_USERNAME
+└── DOCKERHUB_TOKEN
+
+Supply Chain
+├── COSIGN_PRIVATE_KEY
+└── COSIGN_PASSPHRASE
+
+Email
+├── EMAIL_USER
+├── EMAIL_PASS
+├── QA_EMAIL_TO
+└── QA_EMAIL_CC
+```
+
+Secret values are not intended to be committed to source control.
+
+---
+
+# 📊 Reporting Architecture
+
+The reporting model separates pipeline execution from evidence preservation.
+
+```text
+Pipeline Execution
+       │
+       ├── CI
+       ├── QA
+       ├── OWASP
+       ├── SonarCloud
+       ├── Trivy
+       ├── Gitleaks
+       ├── Docker
+       ├── Cosign
+       ├── SBOM
+       └── Attestation
+              │
+              ▼
+       Evidence Collection
+              │
+       ┌──────┴──────┐
+       ▼             ▼
+     HTML           JSON
+    Reports        Evidence
+       │             │
+       └──────┬──────┘
+              ▼
+       Jenkins Artifacts
+              │
+              ▼
+       Email Notification
+```
+
+---
+
+# 🛡️ Supply-Chain Security Model
+
+The final production artifact follows this security chain:
+
+```text
+Source Code
+     │
+     ▼
+GitHub Repository
+     │
+     ▼
+Jenkins Validation
+     │
+     ├── CI
+     ├── QA
+     ├── OWASP
+     ├── SonarCloud
+     ├── Trivy
+     └── Gitleaks
+     │
+     ▼
+Production Build
+     │
+     ▼
+Multi-Architecture Image
+     │
+     ▼
+GHCR + Docker Hub
+     │
+     ▼
+Immutable Digest
+     │
+     ▼
+Cosign Signature
+     │
+     ▼
+SPDX SBOM
+     │
+     ▼
+Attestation Verification
+     │
+     ▼
+Machine-Readable Evidence
+     │
+     ▼
+HTML Security Report
+     │
+     ▼
+Automated Email
+```
+
+---
+
+# 📁 Project Structure
+
+```text
+resume-matcher-devops/
+│
+├── Jenkinsfile
+├── jenkins.sh
+├── premain.sh
+├── main.sh
+│
+├── .github/
+│   └── workflows/
+│       ├── jenkins-main.yaml
+│       ├── jenkins-premain.yaml
+│       └── jenkins-agent.yml
+│
+├── scripts/
+│   ├── ci-test.sh
+│   ├── ci-sonarcloud.sh
+│   ├── ci-trivy.sh
+│   ├── ci-owasp.sh
+│   ├── ci-email.sh
+│   └── ...
+│
+├── cypress/
+│   └── e2e/
+│
+├── tests/
+│   └── load.js
+│
+├── reports/
+│   ├── ci/
+│   ├── security/
+│   ├── qa/
+│   └── docker/
+│
+└── application source
+```
+
+---
+
+# 🚀 Execution Summary
+
+## Pre-main Validation
+
+```bash
+./premain.sh
+```
+
+The validation path is:
+
+```text
+Local Changes
+     │
+     ▼
+premain.sh
+     │
+     ▼
+pre-main
+     │
+     ▼
+GitHub
+     │
+     ▼
+Jenkins
+     │
+     ├── CI
+     ├── OWASP
+     ├── QA
+     ├── SonarCloud
+     ├── Trivy
+     └── Gitleaks
+     │
+     ▼
+Security / QA Reports
+     │
+     ▼
+Email
+```
+
+## Production Release
+
+The main branch executes the production release workflow:
+
+```text
+main
+ │
+ ▼
+Jenkins
+ │
+ ├── Checkout
+ ├── Build
+ ├── Docker Buildx
+ ├── linux/amd64
+ ├── linux/arm64
+ ├── GHCR
+ ├── Docker Hub
+ ├── Digest
+ ├── Cosign
+ ├── SPDX SBOM
+ ├── Attestation
+ ├── Security Evidence
+ └── Email
+```
+
+---
+
+# 🎯 Outcome
+
+The completed project demonstrates a Jenkins-centered DevSecOps lifecycle in which application validation, security analysis, QA, containerization, artifact integrity, software transparency, supply-chain verification, and reporting are integrated into a single automated workflow.
+
+The final architecture provides:
+
+```text
+                 ┌──────────────────────────┐
+                 │      Source Control       │
+                 │          GitHub           │
+                 └────────────┬─────────────┘
+                              │
+                              ▼
+                 ┌──────────────────────────┐
+                 │         Jenkins          │
+                 │     CI/CD Orchestrator   │
+                 └────────────┬─────────────┘
+                              │
+             ┌────────────────┼────────────────┐
+             │                │                │
+             ▼                ▼                ▼
+            CI             Security            QA
+             │                │                │
+             │         ┌──────┼──────┐         │
+             │         │      │      │         │
+             │       OWASP Sonar  Trivy      │
+             │                       │         │
+             │                    Gitleaks     │
+             └────────────────┬───────────────┘
+                              │
+                              ▼
+                     Validation Complete
+                              │
+                              ▼
+                         Production
+                              │
+                              ▼
+                       Docker Buildx
+                              │
+                    ┌─────────┴─────────┐
+                    ▼                   ▼
+                  GHCR             Docker Hub
+                    │                   │
+                    └─────────┬─────────┘
+                              │
+                              ▼
+                       Image Digest
+                              │
+                              ▼
+                         Cosign Sign
+                              │
+                              ▼
+                          SPDX SBOM
+                              │
+                              ▼
+                    Attestation Verify
+                              │
+                              ▼
+                       Evidence Store
+                              │
+                              ▼
+                      HTML / JSON Reports
+                              │
+                              ▼
+                       Email Notification
+```
+
+The result is an integrated **Jenkins DevSecOps CI/CD platform** covering the software lifecycle from source-code checkout and automated validation through production container publication and supply-chain evidence generation.
+
+---
+
+# 👤 Author
+
+**Kaif Mohammed Khan**
+
+DevOps / DevSecOps project demonstrating Jenkins CI/CD orchestration, GitHub SCM integration, ephemeral cloud-agent execution, secure ingress, automated QA, security scanning, multi-architecture container publishing, Cosign signing, SBOM generation, attestation verification and automated security reporting.
+
+---
+
+<div align="center">
+
+**© 2026 Kaif. All rights reserved.**
+
+</div>
