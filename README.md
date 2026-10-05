@@ -6,6 +6,7 @@ The implementation combines a locally hosted **Jenkins LTS controller**, **GitHu
 
 The pipeline separates the software lifecycle into two primary paths:
 
+```text
 pre-main
    │
    ├── CI
@@ -29,6 +30,7 @@ pre-main
              ├── SPDX SBOM
              ├── Attestation Verification
              └── Security Evidence
+```
 
 ---
 
@@ -53,6 +55,12 @@ The Jenkins implementation is organized into three major implementation stages:
 3. **Production Container Build, Signing, SBOM & Supply-Chain Verification**
 
 The architecture combines a local Jenkins controller with dynamically provisioned GitHub Actions execution environments and a secure zrok ingress layer.
+
+<div align="center">
+
+<img src="images/jenkins/JENKINS 1/jenkins1.1.png" width="1000"/>
+
+</div>
 
 ---
 
