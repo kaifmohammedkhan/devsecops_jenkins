@@ -56,12 +56,6 @@ The Jenkins implementation is organized into three major implementation stages:
 
 The architecture combines a local Jenkins controller with dynamically provisioned GitHub Actions execution environments and a secure zrok ingress layer.
 
-<div align="center">
-
-<img src="images/jenkins/JENKINS 1/jenkins1.1.png" width="1000"/>
-
-</div>
-
 ---
 
 # Step 1: Jenkins Infrastructure, SCM & Cloud-Agent Setup
